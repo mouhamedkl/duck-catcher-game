@@ -219,8 +219,8 @@ export default function Home() {
           <ambientLight intensity={0.5} />
           <pointLight position={[10, 10, 10]} />
           <StarBackground />
-          <DuckModel onHit={incrementScore} />
-          <BonusItem onCollect={collectBonus} />
+          {!gameOver && <DuckModel onHit={incrementScore} />}
+          {!gameOver && <BonusItem onCollect={collectBonus} />}
           <OrbitControls />
         </Suspense>
       </Canvas>
