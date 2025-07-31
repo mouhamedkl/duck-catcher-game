@@ -8,6 +8,7 @@ import { Vector3 } from 'three'
 import * as THREE from 'three'
 import { Howl } from 'howler'
 
+
 const StarBackground = () => {
   const ref = useRef<THREE.Points>(null)
   const pointCount = 5000
@@ -103,6 +104,21 @@ export default function Home() {
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(30)
   const [gameOver, setGameOver] = useState(false)
+const [topScore, setTopScore] = useState(0)
+
+useEffect(() => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('topScore')
+    if (stored) setTopScore(parseInt(stored, 10))
+  }
+}, [])
+
+useEffect(() => {
+  if (gameOver && score > topScore) {
+    setTopScore(score)
+    localStorage.setItem('topScore', score.toString())
+  }
+}, [gameOver])
 
   const incrementScore = () => {
     if (!gameOver) setScore((prev) => prev + 1)
@@ -112,9 +128,9 @@ export default function Home() {
     if (!gameOver) setScore((prev) => prev + 5)
   }
 
+  // Timer
   useEffect(() => {
     if (gameOver) return
-
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -125,9 +141,16 @@ export default function Home() {
         return prev - 1
       })
     }, 1000)
-
     return () => clearInterval(timer)
   }, [gameOver])
+
+  // Save top score if higher
+  useEffect(() => {
+    if (score > topScore) {
+      setTopScore(score)
+      localStorage.setItem('topScore', score.toString())
+    }
+  }, [score, topScore])
 
   return (
     <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
@@ -144,10 +167,22 @@ export default function Home() {
         Score: {score}
       </div>
 
+      <div style={{
+        position: 'absolute',
+        top: 60,
+        left: 20,
+        color: 'yellow',
+        fontSize: '1.5rem',
+        zIndex: 10,
+        fontFamily: 'monospace'
+      }}>
+        Top Score: {topScore}
+      </div>
+
       {/* Timer bar */}
       <div style={{
         position: 'absolute',
-        top: 70,
+        top: 100,
         left: 20,
         right: 20,
         height: '10px',
@@ -166,19 +201,17 @@ export default function Home() {
 
       {/* Game Over UI */}
       {gameOver && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            color: 'red',
-            fontSize: '3rem',
-            fontFamily: 'monospace',
-            zIndex: 10,
-            textAlign: 'center',
-          }}
-        >
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: 'red',
+          fontSize: '3rem',
+          fontFamily: 'monospace',
+          zIndex: 10,
+          textAlign: 'center',
+        }}>
           GAME OVER<br />Final Score: {score}
           <br />
           <button
