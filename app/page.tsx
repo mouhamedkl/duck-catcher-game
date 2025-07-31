@@ -1,103 +1,229 @@
-import Image from "next/image";
+'use client'
+
+import { Canvas, useFrame } from '@react-three/fiber'
+import { Suspense, useRef, useState, useEffect } from 'react'
+import { Points, PointMaterial, OrbitControls, useGLTF } from '@react-three/drei'
+import * as random from 'maath/random'
+import { Vector3 } from 'three'
+import * as THREE from 'three'
+import { Howl } from 'howler'
+
+const StarBackground = () => {
+  const ref = useRef<THREE.Points>(null)
+  const pointCount = 5000
+  const [sphere] = useState(() => {
+    const arr = random.inSphere(new Float32Array(pointCount * 3), { radius: 20 })
+    return new Float32Array(arr.buffer)
+  })
+
+  useFrame((_state, delta) => {
+    if (ref.current) {
+      ref.current.rotation.x -= delta / 10
+      ref.current.rotation.y -= delta / 15
+    }
+  })
+
+  return (
+    <group rotation={[0, 0, 0]}>
+      <Points ref={ref} positions={sphere} stride={3} frustumCulled>
+        <PointMaterial transparent color="#ffffff" size={0.003} sizeAttenuation depthWrite={false} />
+      </Points>
+    </group>
+  )
+}
+
+const BonusItem = ({ onCollect }: { onCollect: () => void }) => {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const [visible, setVisible] = useState(false)
+  const [position, setPosition] = useState<Vector3>(() => new Vector3())
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const x = (Math.random() - 0.5) * 20
+      const y = (Math.random() - 0.5) * 10
+      const z = (Math.random() - 0.5) * 10
+      setPosition(new Vector3(x, y, z))
+      setVisible(true)
+
+      setTimeout(() => setVisible(false), 3000)
+    }, 7000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  return visible ? (
+    <mesh
+      ref={meshRef}
+      position={position}
+      onClick={() => {
+        onCollect()
+        setVisible(false)
+        new Howl({ src: ['/bonus.mp3'] }).play()
+      }}
+    >
+      <sphereGeometry args={[0.3, 32, 32]} />
+      <meshStandardMaterial color="gold" emissive="yellow" />
+    </mesh>
+  ) : null
+}
+
+const DuckModel = ({ onHit }: { onHit: () => void }) => {
+  const { scene } = useGLTF('/Duck.glb')
+  const [position, setPosition] = useState<Vector3>(() => new Vector3(0, 0, 0))
+
+  const moveDuck = () => {
+    const x = (Math.random() - 0.5) * 15
+    const y = (Math.random() - 0.5) * 8
+    const z = (Math.random() - 0.5) * 8
+    setPosition(new Vector3(x, y, z))
+  }
+
+  const handleClick = () => {
+    onHit()
+    const sound = new Howl({ src: ['/quack_5.mp3'] })
+    sound.play()
+    moveDuck()
+  }
+
+  useEffect(() => {
+    moveDuck()
+  }, [])
+
+  return (
+    <primitive
+      object={scene}
+      scale={1}
+      position={position}
+      onClick={handleClick}
+    />
+  )
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [score, setScore] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(30)
+  const [gameOver, setGameOver] = useState(false)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const incrementScore = () => {
+    if (!gameOver) setScore((prev) => prev + 1)
+  }
+
+  const collectBonus = () => {
+    if (!gameOver) setScore((prev) => prev + 5)
+  }
+
+  useEffect(() => {
+    if (gameOver) return
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          setGameOver(true)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [gameOver])
+
+  return (
+    <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+      {/* Score */}
+      <div style={{
+        position: 'absolute',
+        top: 20,
+        left: 20,
+        color: 'white',
+        fontSize: '2rem',
+        zIndex: 10,
+        fontFamily: 'monospace'
+      }}>
+        Score: {score}
+      </div>
+
+      {/* Timer bar */}
+      <div style={{
+        position: 'absolute',
+        top: 70,
+        left: 20,
+        right: 20,
+        height: '10px',
+        backgroundColor: '#555',
+        zIndex: 10,
+        borderRadius: '5px',
+      }}>
+        <div style={{
+          width: `${(timeLeft / 30) * 100}%`,
+          height: '100%',
+          backgroundColor: '#0f0',
+          transition: 'width 1s linear',
+          borderRadius: '5px'
+        }} />
+      </div>
+
+      {/* Game Over UI */}
+      {gameOver && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: 'red',
+            fontSize: '3rem',
+            fontFamily: 'monospace',
+            zIndex: 10,
+            textAlign: 'center',
+          }}
+        >
+          GAME OVER<br />Final Score: {score}
+          <br />
+          <button
+            onClick={() => {
+              setScore(0)
+              setTimeLeft(30)
+              setGameOver(false)
+            }}
+            style={{
+              marginTop: '1rem',
+              padding: '10px 20px',
+              fontSize: '1.5rem',
+              backgroundColor: 'white',
+              color: 'black',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Replay
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+
+      {/* Canvas */}
+      <Canvas
+        camera={{ position: [0, 0, 15], fov: 75 }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'black',
+        }}
+      >
+        <Suspense fallback={null}>
+          <ambientLight intensity={0.5} />
+          <pointLight position={[10, 10, 10]} />
+          <StarBackground />
+          <DuckModel onHit={incrementScore} />
+          <BonusItem onCollect={collectBonus} />
+          <OrbitControls />
+        </Suspense>
+      </Canvas>
     </div>
-  );
+  )
 }
